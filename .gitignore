@@ -1,0 +1,14 @@
+*.pyc
+build/
+conaninfo.txt
+conanbuildinfo.*
+
+#Qt creator files
+*.creator
+*.creator.user
+*.config
+*.files
+*.includes
+
+# Waf
+.lock-waf*
