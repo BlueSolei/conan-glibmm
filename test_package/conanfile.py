@@ -1,43 +1,27 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from conans import ConanFile, CMake
 import os
-from os import path
 
-username = os.getenv("CONAN_USERNAME", "noface")
-channel  = os.getenv("CONAN_CHANNEL", "testing")
-version  = "2.48.1"
-name     = "glibmm"
+from conans import ConanFile, CMake, tools
 
-class TestPackage(ConanFile):
+
+class GlibmmTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    requires = (
-        "%s/%s@%s/%s" % (name, version, username, channel),
-    )
-    build_requires = (
-        "waf/0.1.1@noface/stable",
-        "WafGenerator/0.0.5@noface/stable"
-    )
-
-    generators = "Waf"
-    exports = "wscript"
-
-    def imports(self):
-        # Copy waf executable to project folder
-        self.copy("waf", dst=".")
-
-        self.copy("*.dll", dst="bin", src="bin")    # From bin to bin
-        self.copy("*.dylib*", dst="bin", src="lib") # From lib to bin
+    generators = "cmake"
+    requires = "glibmm/2.58.1"
+    default_options = {"glib:shared": True, "glibmm:shared": True}
 
     def build(self):
-        self.build_path = path.abspath("build")
+        cmake = CMake(self)
+        # Current dir is "test_package/build/<build_id>" and CMakeLists.txt is
+        # in "test_package"
+        cmake.configure()
+        cmake.build()
 
-        self.run(
-            "waf configure build -o %s" % (self.build_path),
-            cwd=self.conanfile_directory)
+    def imports(self):
+        self.copy("*.dll", dst="bin", src="bin")
+        self.copy("*.dylib*", dst="bin", src="lib")
+        self.copy('*.so*', dst='bin', src='lib')
 
     def test(self):
-        exec_path = path.join(self.build_path, 'example')
-        self.output.info("running test: " + exec_path)
-        self.run(exec_path)
+        if not tools.cross_building(self.settings):
+            os.chdir("bin")
+            self.run(".%sexample" % os.sep)
