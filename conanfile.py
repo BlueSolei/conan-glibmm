@@ -58,9 +58,6 @@ class Recipe(ConanFile):
         with tools.chdir(src), tools.environment_append({"PKG_CONFIG_PATH": self.build_folder}):
             autotools = AutoToolsBuildEnvironment(self)
             autotools.libs.append('resolv')  # MacOS depend on libresolv for some reason
-            is_shared = "yes" if self.options["shared"] else "no"
-            is_static = "yes" if not self.options["shared"] else "no"
-            args = [f"--enable-static={is_static}", f"--enable-shared={is_shared}"]
             autotools.configure()
             autotools.make()
             autotools.install()  # put all artifacts in folder name "package".
