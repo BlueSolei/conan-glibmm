@@ -1,15 +1,13 @@
 import os
 from os import path
 
-from conans import ConanFile, tools
-from conans.tools import download, untargz, check_sha256, pythonpath
-
-from pkg_config import PkgEnv
+from conans import ConanFile, tools, AutoToolsBuildEnvironment
+from conans.tools import untargz, pythonpath, download, check_sha256
 
 
 class Recipe(ConanFile):
     name = "glibmm"
-    version = "2.63.1"
+    version = "2.58.1"  # "2.63.1"
     description = "glibmm, a C++ API for parts of glib that are useful for C++"
     license = "LGPL"
     url = "https://gitlab.com/no-face/glibmm-conan"  # recipe repo url
@@ -25,7 +23,7 @@ class Recipe(ConanFile):
         "shared": [True, False],
     }
     default_options = (
-        "shared=True",
+        "shared=False",
     )
 
     requires = (
@@ -33,31 +31,41 @@ class Recipe(ConanFile):
         "glib/2.58.3@bincrafters/stable"
     )
 
-    #    build_requires    = (
-    #        "AutotoolsHelper/0.0.1@noface/experimental"
-    #    )
-
-    exports = "pkg_config.py"
+    generators = "pkg_config"
 
     BASE_URL_DOWNLOAD = "https://download.gnome.org/sources/" + name
     VER_MAGOR = "{}.{}".format(*version.split('.')[:2])
     GLIBMM_FILE_BASE_NAME = "{}-{}".format(name, version)  # e.g. glibmm-2.63.1
     FILE_URL = "{}/{}/{}.tar.xz".format(BASE_URL_DOWNLOAD, VER_MAGOR, GLIBMM_FILE_BASE_NAME)
-    FILE_SHA256 = '4f99e29bd0a67afd94c0d6fdad2b86bc5cd944cd5d4ff097520dc58b6c997ada'
+    FILE_SHA256 = '6e5fe03bdf1e220eeffd543e017fd2fb15bcec9235f0ffd50674aff9362a85f0'
 
     def source(self):
         zip_name = self.name + ".tar.xz"
         download(self.FILE_URL, zip_name)
         check_sha256(zip_name, self.FILE_SHA256)
         untargz(zip_name)  # will extract sources to a folder named GLIBMM_FILE_BASE_NAME
+        os.remove(zip_name)
 
     def build(self):
-        with tools.environment_append(self.build_env()):
-            self.prepare_build()
-            self.configure_and_make()
+        sig_cpp_pc_old = os.path.join(self.build_folder, "sigc++.pc")
+        sig_cpp_pc_new = os.path.join(self.build_folder, "sigc++-2.0.pc")
+        if os.path.exists(sig_cpp_pc_old):
+            print(f"rename({sig_cpp_pc_old} -->, {sig_cpp_pc_new})")
+            os.rename(sig_cpp_pc_old, sig_cpp_pc_new)
+
+        src = os.path.join(self.build_folder, self.GLIBMM_FILE_BASE_NAME)
+        with tools.chdir(src), tools.environment_append({"PKG_CONFIG_PATH": self.build_folder}):
+            autotools = AutoToolsBuildEnvironment(self)
+            autotools.libs.append('resolv')
+            is_shared = "yes" if self.options["shared"] else "no"
+            is_static = "yes" if not self.options["shared"] else "no"
+            args = [f"--enable-static={is_static}", f"--enable-shared={is_shared}"]
+            autotools.configure(args=args)
+            autotools.make()
+            autotools.install()
 
     def package(self):
-        self.output.info("Files already installed in build step")
+        pass
 
     def package_info(self):
         glibmmdir = "glibmm-2.4"
@@ -73,45 +81,3 @@ class Recipe(ConanFile):
         self.cpp_info.includedirs = includes
         self.cpp_info.resdirs = ['share']
         self.cpp_info.libs = ["glibmm-2.4", "giomm-2.4"]
-
-    ##################################################################################################
-
-    def build_env(self):
-        pkgEnv = PkgEnv(self)
-
-        pkgEnv.add_pkg("libsigcplusplus", prefix="GLIBMM")
-        pkgEnv.add_pkg("libsigcplusplus", prefix="GIOMM")
-        pkgEnv.add_pkg("glib", prefix="GLIBMM", libs=["gobject-2.0", "gmodule-2.0", "glib-2.0"])
-        pkgEnv.add_pkg("glib", prefix="GIOMM", libs=["gio-2.0", "glib-2.0"])
-
-        env = pkgEnv.env
-
-        self.output.info("env: " + str(env))
-
-        return env
-
-    def prepare_build(self):
-        self.output.info("preparing build")
-
-        if getattr(self, "package_dir", None) is None:
-            # Make install dir
-            self.package_dir = path.abspath(path.join(".", "install"))
-            self._try_make_dir(self.package_dir)
-
-    def configure_and_make(self):
-        with tools.chdir(self.GLIBMM_FILE_BASE_NAME), pythonpath(self):
-            from autotools_helper import Autotools
-
-            autot = Autotools(self,
-                              shared=self.options.shared)
-
-            autot.configure()
-            autot.build()
-            autot.install()
-
-    def _try_make_dir(self, dir):
-        try:
-            os.mkdir(dir)
-        except OSError:
-            # dir already exist
-            pass
