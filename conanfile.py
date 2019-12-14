@@ -33,17 +33,17 @@ class Recipe(ConanFile):
 
     generators = "pkg_config"
 
-    BASE_URL_DOWNLOAD = "https://download.gnome.org/sources/" + name
+    BASE_URL_DOWNLOAD = "https://download.gnome.org/sources/glibmm"
     VERSION_MAJOR = "{}.{}".format(*version.split('.')[:2])
-    FILE_BASE_NAME = "{}-{}".format(name, version)  # e.g. glibmm-2.58.1
-    FILE_URL = "{}/{}/{}.tar.xz".format(BASE_URL_DOWNLOAD, VERSION_MAJOR, FILE_BASE_NAME)
+    FILE_BASE_NAME = f"glibmm-{version}"
+    FILE_URL = f"{BASE_URL_DOWNLOAD}/{VERSION_MAJOR}/{FILE_BASE_NAME}.tar.xz"
     FILE_SHA256 = '6e5fe03bdf1e220eeffd543e017fd2fb15bcec9235f0ffd50674aff9362a85f0'
 
     def source(self):
-        zip_name = self.name + ".tar.xz"
+        zip_name = "glibmm.tar.xz"
         download(self.FILE_URL, zip_name)
         check_sha256(zip_name, self.FILE_SHA256)
-        untargz(zip_name)  # the zipped folder name is FILE_BASE_NAME. this will extract it.
+        untargz(zip_name)  # the zipped folder name is FILE_BASE_NAME
         os.remove(zip_name)
 
     def build(self):
@@ -51,7 +51,7 @@ class Recipe(ConanFile):
         sig_cpp_pc_old = os.path.join(self.build_folder, "sigc++.pc")
         sig_cpp_pc_new = os.path.join(self.build_folder, "sigc++-2.0.pc")
         if os.path.exists(sig_cpp_pc_old):
-            print(f"rename({sig_cpp_pc_old} -->, {sig_cpp_pc_new})")
+            print(f"rename({sig_cpp_pc_old} --> {sig_cpp_pc_new})")
             os.rename(sig_cpp_pc_old, sig_cpp_pc_new)
 
         src = os.path.join(self.build_folder, self.FILE_BASE_NAME)
